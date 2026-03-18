@@ -391,3 +391,188 @@ def plot_all_uplift_diagnostics(
             save_path=(output_dir / "training_history.png") if output_dir else None,
             show=show,
         )
+
+
+def plot_pred_vs_true_uplift_compare(
+    tau_true: np.ndarray,
+    pred_dict: dict[str, np.ndarray],
+    sample_size: int | None = 5000,
+    seed: int = 42,
+    save_path: str | Path | None = None,
+    show: bool = True,
+) -> None:
+    """
+    pred_dict example:
+      {
+        "DragonNet": tau_hat_dragon,
+        "T-learner": tau_hat_tlearner,
+      }
+    """
+    tau_true = np.asarray(tau_true, dtype=float).reshape(-1)
+
+    plt.figure(figsize=(7, 6))
+
+    rng = np.random.default_rng(seed)
+    if sample_size is not None and len(tau_true) > sample_size:
+        idx = rng.choice(len(tau_true), size=sample_size, replace=False)
+    else:
+        idx = np.arange(len(tau_true))
+
+    xy_min = float(np.min(tau_true[idx]))
+    xy_max = float(np.max(tau_true[idx]))
+
+    for name, tau_hat in pred_dict.items():
+        tau_hat = np.asarray(tau_hat, dtype=float).reshape(-1)
+        if len(tau_hat) != len(tau_true):
+            raise ValueError(f"{name}: tau_hat length mismatch.")
+        corr = np.corrcoef(tau_true, tau_hat)[0, 1]
+        plt.scatter(
+            tau_true[idx],
+            tau_hat[idx],
+            alpha=0.25,
+            s=12,
+            label=f"{name} (corr={corr:.3f})",
+        )
+        xy_min = min(xy_min, float(np.min(tau_hat[idx])))
+        xy_max = max(xy_max, float(np.max(tau_hat[idx])))
+
+    plt.plot([xy_min, xy_max], [xy_min, xy_max], linestyle="--")
+    plt.xlabel("True uplift")
+    plt.ylabel("Predicted uplift")
+    plt.title("Predicted uplift vs true uplift")
+    plt.legend()
+    plt.grid(alpha=0.25)
+
+    _maybe_savefig(save_path)
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+
+def plot_uplift_curve_compare(
+    curve_dict: dict[str, pd.DataFrame],
+    title: str = "Cumulative uplift curve",
+    save_path: str | Path | None = None,
+    show: bool = True,
+) -> None:
+    """
+    curve_dict example:
+      {
+        "DragonNet": dragon_curve_df,
+        "T-learner": t_curve_df,
+      }
+    """
+    plt.figure(figsize=(8, 5))
+
+    oracle_drawn = False
+    random_drawn = False
+
+    for name, df in curve_dict.items():
+        plt.plot(df["frac"], df["mean_true_uplift_topk"], label=name)
+
+        if not oracle_drawn:
+            plt.plot(
+                df["frac"],
+                df["oracle_mean_true_uplift_topk"],
+                label="Oracle ranking",
+            )
+            oracle_drawn = True
+
+        if not random_drawn:
+            plt.plot(
+                df["frac"],
+                df["random_mean_true_uplift"],
+                linestyle="--",
+                label="Random baseline",
+            )
+            random_drawn = True
+
+    plt.xlabel("Top fraction treated")
+    plt.ylabel("Mean true uplift in selected set")
+    plt.title(title)
+    plt.legend()
+    plt.grid(alpha=0.25)
+
+    _maybe_savefig(save_path)
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+
+def plot_qini_curve_compare(
+    qini_dict: dict[str, pd.DataFrame],
+    title: str = "Qini-like curve",
+    save_path: str | Path | None = None,
+    show: bool = True,
+) -> None:
+    plt.figure(figsize=(8, 5))
+
+    oracle_drawn = False
+    random_drawn = False
+
+    for name, df in qini_dict.items():
+        plt.plot(df["frac"], df["pred_incremental_conversions"], label=name)
+
+        if not oracle_drawn:
+            plt.plot(
+                df["frac"],
+                df["oracle_incremental_conversions"],
+                label="Oracle ranking",
+            )
+            oracle_drawn = True
+
+        if not random_drawn:
+            plt.plot(
+                df["frac"],
+                df["random_incremental_conversions"],
+                linestyle="--",
+                label="Random baseline",
+            )
+            random_drawn = True
+
+    plt.xlabel("Top fraction treated")
+    plt.ylabel("Incremental conversions")
+    plt.title(title)
+    plt.legend()
+    plt.grid(alpha=0.25)
+
+    _maybe_savefig(save_path)
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+
+def plot_calibration_compare(
+    calib_dict: dict[str, pd.DataFrame],
+    title: str = "Uplift calibration comparison",
+    save_path: str | Path | None = None,
+    show: bool = True,
+) -> None:
+    plt.figure(figsize=(6, 6))
+
+    xy_min = float("inf")
+    xy_max = float("-inf")
+
+    for name, df in calib_dict.items():
+        x = df["tau_hat_mean"].to_numpy(dtype=float)
+        y = df["tau_true_mean"].to_numpy(dtype=float)
+        plt.plot(x, y, marker="o", label=name)
+
+        xy_min = min(xy_min, float(np.min(x)), float(np.min(y)))
+        xy_max = max(xy_max, float(np.max(x)), float(np.max(y)))
+
+    plt.plot([xy_min, xy_max], [xy_min, xy_max], linestyle="--")
+    plt.xlabel("Mean predicted uplift")
+    plt.ylabel("Mean true uplift")
+    plt.title(title)
+    plt.legend()
+    plt.grid(alpha=0.25)
+
+    _maybe_savefig(save_path)
+    if show:
+        plt.show()
+    else:
+        plt.close()
