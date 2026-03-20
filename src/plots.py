@@ -576,3 +576,109 @@ def plot_calibration_compare(
         plt.show()
     else:
         plt.close()
+
+# Uplift bidding budget sweep.
+
+def plot_budget_sweep_metric(
+    sweep_df: pd.DataFrame,
+    metric: str,
+    x_col: str = "spend",
+    title: str | None = None,
+    save_path: str | Path | None = None,
+    show: bool = True,
+) -> None:
+    required = {x_col, "policy", metric}
+    missing = required - set(sweep_df.columns)
+    if missing:
+        raise ValueError(f"sweep_df missing columns: {missing}")
+
+    plt.figure(figsize=(8, 5))
+
+    for policy_name, g in sweep_df.groupby("policy", sort=False):
+        g = g.sort_values(x_col)
+        plt.plot(g[x_col], g[metric], marker="o", label=policy_name)
+
+    plt.xlabel(x_col.replace("_", " ").title())
+    plt.ylabel(metric.replace("_", " ").title())
+    plt.title(title or f"{metric} vs {x_col}")
+    plt.legend()
+    plt.grid(alpha=0.25)
+
+    _maybe_savefig(save_path)
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+
+def plot_budget_sweep_incremental_frontier(
+    sweep_df: pd.DataFrame,
+    save_path: str | Path | None = None,
+    show: bool = True,
+) -> None:
+    """
+    x-axis: spend
+    y-axis: expected incremental conversions
+    """
+    required = {"spend", "policy", "expected_incremental_conversions"}
+    missing = required - set(sweep_df.columns)
+    if missing:
+        raise ValueError(f"sweep_df missing columns: {missing}")
+
+    plt.figure(figsize=(8, 5))
+
+    for policy_name, g in sweep_df.groupby("policy", sort=False):
+        g = g.sort_values("spend")
+        plt.plot(
+            g["spend"],
+            g["expected_incremental_conversions"],
+            marker="o",
+            label=policy_name,
+        )
+
+    plt.xlabel("Spend")
+    plt.ylabel("Expected incremental conversions")
+    plt.title("Budget frontier: spend vs incremental conversions")
+    plt.legend()
+    plt.grid(alpha=0.25)
+
+    _maybe_savefig(save_path)
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+
+def plot_budget_sweep_efficiency(
+    sweep_df: pd.DataFrame,
+    efficiency_col: str = "incremental_conv_per_1k",
+    save_path: str | Path | None = None,
+    show: bool = True,
+) -> None:
+    required = {"spend", "policy", efficiency_col}
+    missing = required - set(sweep_df.columns)
+    if missing:
+        raise ValueError(f"sweep_df missing columns: {missing}")
+
+    plt.figure(figsize=(8, 5))
+
+    for policy_name, g in sweep_df.groupby("policy", sort=False):
+        g = g.sort_values("spend")
+        plt.plot(
+            g["spend"],
+            g[efficiency_col],
+            marker="o",
+            label=policy_name,
+        )
+
+    plt.xlabel("Spend")
+    plt.ylabel(efficiency_col.replace("_", " ").title())
+    plt.title(f"Efficiency vs spend: {efficiency_col}")
+    plt.legend()
+    plt.grid(alpha=0.25)
+
+    _maybe_savefig(save_path)
+    if show:
+        plt.show()
+    else:
+        plt.close()
